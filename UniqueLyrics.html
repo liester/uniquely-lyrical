@@ -1,0 +1,262 @@
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/5.0.0/normalize.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
+    <style>
+        #main_content {
+          width: 50%;
+          margin: 0 auto;
+          text-align: center;
+        }
+
+        #searchResults {
+            text-align: left;
+        }
+    </style>
+<script src="https://code.jquery.com/jquery-3.1.1.min.js" integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8="
+    crossorigin="anonymous"></script>
+</head>
+
+<body>
+    <div id="main_content">
+
+    </div>
+</body>
+<script>
+    buildUI();
+    function buildUI() {
+        let eventName = 'buildUIFinished';
+        let buildUIFinish = new Event(eventName);
+        let main_content = getById('main_content');
+
+        // main_content.addEventListener(eventName, makeQuery());
+
+        let searchFields = buildSearchFields();
+        let results = buildResults();
+
+        main_content.appendChild(searchFields);
+        main_content.appendChild(results);
+
+        main_content.dispatchEvent(buildUIFinish);
+    }
+
+
+    function getLyricsBySongId(songId, successCallback) {
+        let link = "http://genius.com/songs/" + songId + "/embed.js";
+        let xhr = createCORSRequest('GET', link, () => {
+
+            clearPreviousResults();
+
+            let lyrics = xhr.responseText.split('document.write');
+            let filtered = lyrics.filter((item) => {
+                if (item.includes('JSON.parse')) {
+                    return item;
+                }
+            });
+            let htmlContent = (filtered[0]);
+            htmlContent = htmlContent.slice(12);
+            htmlContent = htmlContent.slice(0, htmlContent.length - 1);
+            htmlContent = htmlContent.replace(/\\n/g, '').replace(/\\/g, '')
+
+            let lyricsDiv = createElement('div');
+            lyricsDiv.innerHTML = htmlContent;
+            let mainDiv = lyricsDiv.querySelector('div').querySelectorAll('a');
+            let full_lyrics = [];
+            mainDiv.forEach(tag => {
+                full_lyrics.push(tag.innerText);
+            });
+            lyricsDiv.innerHTML = '<pre>' + full_lyrics.join('</br>') + '</pre>';
+            lyricsDiv.id = 'full_lyrics';
+            getById('lyricResults').appendChild(lyricsDiv);
+
+        });
+
+        xhr.send();
+    }
+
+    function clearPreviousResults() {
+        let previous_lyrics = getById('full_lyrics');
+        if (previous_lyrics) {
+            let parent = previous_lyrics.parentElement;
+            parent.removeChild(previous_lyrics);
+        }
+        let previous_search = getById('hitsDiv');
+        if (previous_search) {
+            let parent = previous_search.parentElement;
+            parent.removeChild(previous_search);
+        }
+    }
+
+
+
+    function buildSearchFields() {
+        let searchFields = createElement('div');
+        searchFields.id = 'searchFields';
+        let selectOptions = buildSelectOptions();
+        let searchParameterInput = buildSearchParameterInput();
+        let searchButton = buildSearchButton();
+        searchFields.appendChild(selectOptions);
+        searchFields.appendChild(searchParameterInput);
+        searchFields.appendChild(searchButton);
+
+        return searchFields;
+    }
+    function buildSearchButton() {
+        let searchButton = createElement('button', 'Search');
+        searchButton.id = 'searchButton';
+        searchButton.addEventListener('click', e => {
+            let searchParameter = getById('searchParam').value;
+            let searchOption = getById('selectOptions').value;
+            if (searchOption == 1) {
+                let searchUrl = 'https://api.genius.com/search?q=' + searchParameter;
+                let searchReqeust = createCORSRequest('GET', searchUrl, () => {
+                    clearPreviousResults();
+                    let searchResults = getById('searchResults');
+                    let hitsDiv = createElement('div');
+                    hitsDiv.id = 'hitsDiv';
+                    searchResults.appendChild(hitsDiv);
+                    let resultJson = JSON.parse(searchReqeust.responseText);
+                    let hits = resultJson.response.hits;
+                    hits.forEach(hit => {
+                        let listItem = createElement('li');
+                        let content = document.createTextNode(hit.result.full_title);
+                        listItem.appendChild(content);
+                        getById('hitsDiv').appendChild(listItem);
+                    });
+
+                });
+                searchReqeust.send();
+
+            } else if (searchOption == 2) {
+                getLyricsBySongId(searchParameter);
+            }
+        });
+        return searchButton;
+    }
+
+    function buildResults() {
+        let results = createElement('div');
+        results.id = 'results';
+
+        let lyricResults = createElement('div');
+        lyricResults.id = 'lyricResults';
+        let searchResults = createElement('div');
+        searchResults.id = 'searchResults';
+
+        results.appendChild(searchResults);
+        results.appendChild(lyricResults);
+
+        return results;
+    }
+
+    function buildSelectOptions() {
+        let selectOptions = createElement('select');
+        selectOptions.id = 'selectOptions';
+        let options = [{
+            name: 'Search',
+            id: 1
+        }, {
+            name: 'Song ID',
+            id: 2
+        }];
+        options = options.forEach(option => {
+            let optionElement = createElement('option');
+            optionElement.value = option.id;
+            optionElement.appendChild(document.createTextNode(option.name));
+            selectOptions.appendChild(optionElement);
+        });
+        selectOptions.onchange = clearSearchInput;
+        return selectOptions;
+    }
+
+    function clearSearchInput(id) {
+        getById('searchParam').value = '';
+    }
+
+    function buildSearchParameterInput() {
+        let searchInput = createElement('input');
+        searchInput.id = 'searchParam';
+        searchInput.value = 'Sia';
+        searchInput.type = 'text';
+        searchInput.addEventListener('keypress', function (e) {
+            var key = e.which || e.keyCode;
+            if (key === 13) { // 13 is enter
+               getById('searchButton').click();
+            }
+        });
+        return searchInput;
+    }
+
+    function createElement(tag, content) {
+        let element = document.createElement(tag);
+        if (content) {
+            let elementContent = document.createTextNode(content);
+            element.appendChild(elementContent);
+        }
+        return element;
+    }
+
+    function createCORSRequest(method, url, successCallback) {
+        if (url.includes('?')) {
+            url += '&&access_token=5G4U3tL8_nqFE9Bdj7Blr6-UeUWVkkiQqstOzk946z7Zo9Dgrve4TF3mdXNIK3FU'
+        } else {
+            url += '?access_token=5G4U3tL8_nqFE9Bdj7Blr6-UeUWVkkiQqstOzk946z7Zo9Dgrve4TF3mdXNIK3FU';
+        }
+        var xhr = new XMLHttpRequest();
+        if ("withCredentials" in xhr) {
+            xhr.open(method, url, true);
+        } else if (typeof XDomainRequest != "undefined") {
+            xhr = new XDomainRequest();
+            xhr.open(method, url);
+        } else {
+            xhr = null;
+        }
+        xhr.onload = successCallback;
+        return xhr;
+    }
+
+    function getById(id) {
+        return document.getElementById(id);
+    }
+
+
+
+    // function makeQuery(url) {
+    //     // var url = 'https://api.genius.com/songs/49799';
+    //     var url = 'https://api.genius.com/songs/378195';
+    //     var xhr = createCORSRequest('GET', url);
+    //     xhr.onload = function () {
+    //         let resultJson = JSON.parse(xhr.responseText);
+    //         let embedContent = resultJson.response.song.embed_content;
+    //         let songId = resultJson.response.song.id;
+    //         let lyricsUrl = resultJson.response.song.url;
+
+    //         let lyricsLink = createElement('a', lyricsUrl);
+    //         lyricsLink.href = lyricsUrl;
+    //         lyricsLink.target = '_blank';
+
+    //         let results = createElement('div', 'Lyric URL: ');
+    //         results.appendChild(lyricsLink);
+
+    //         let fetchLyrics = createElement('input', 'Fetch Lyrics');
+    //         fetchLyrics.type = 'submit';
+    //         fetchLyrics.addEventListener('click', () => {
+    //             getLyricsBySongId(songId);
+    //         });
+
+    //         let resultsDiv = getById('results');
+    //         resultsDiv.appendChild(results);
+    //         resultsDiv.appendChild(fetchLyrics);
+
+    //     };
+
+    //     xhr.onerror = function () {
+    //         console.log('Woops, there was an error making the request.');
+    //     };
+
+    //     xhr.send();
+    // }
+</script>
+
+</html>
