@@ -43,7 +43,7 @@
 
 
     function getLyricsBySongId(songId, successCallback) {
-        let link = "http://genius.com/songs/" + songId + "/embed.js";
+        let link = "https://genius.com/songs/" + songId + "/embed.js";
         let xhr = createCORSRequest('GET', link, () => {
 
             clearPreviousResults();
