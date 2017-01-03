@@ -64,9 +64,9 @@
             lyricsDiv.innerHTML = htmlContent;
             let mainDiv = lyricsDiv.querySelector('div').querySelectorAll('a');
             let full_lyrics = [];
-            mainDiv.forEach(tag => {
-                full_lyrics.push(tag.innerText);
-            });
+            for(var i = 0; i<mainDiv.length;i++){
+                full_lyrics.push(mainDiv[i].innerText);
+            }
             lyricsDiv.innerHTML = '<pre>' + full_lyrics.join('</br>') + '</pre>';
             lyricsDiv.id = 'full_lyrics';
             getById('lyricResults').appendChild(lyricsDiv);
